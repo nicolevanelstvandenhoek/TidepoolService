@@ -90,7 +90,7 @@ public struct SettingsView: View {
                             VStack(alignment: .leading) {
                                 Text(error.localizedDescription)
                                     .font(.callout)
-                                    .foregroundColor(.red)
+                                    .foregroundColor(.pink)
                             }
                             .padding()
                         }
