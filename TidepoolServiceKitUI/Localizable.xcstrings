@@ -294,7 +294,15 @@
       }
     },
     "Continue" : {
-      "comment" : "Delete Tidepool service button title"
+      "comment" : "Delete Tidepool service button title",
+      "localizations" : {
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Doorgaan"
+          }
+        }
+      }
     },
     "Delete Service" : {
       "comment" : "Button title to delete a service\nDelete Tidepool service button title",
