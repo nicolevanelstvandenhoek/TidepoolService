@@ -6,7 +6,7 @@
 //  Copyright © 2021 LoopKit Authors. All rights reserved.
 //
 
-import HealthKit
+import LoopAlgorithm
 import LoopKit
 import TidepoolKit
 
@@ -35,6 +35,7 @@ import TidepoolKit
  - manualBolusRequested            Double?                              TDosingDecisionDatum.requestedBolus
  - warnings                        [Issue]                              TDosingDecisionDatum.warnings
  - errors                          [Issue]                              TDosingDecisionDatum.errors
+ - algorithmExperiments            [AlgorithmExperiment]?               TDosingDecisionDatum.payload["algorithmExperiments"]
  - syncIdentifier                  UUID                                 .id, .origin, .payload["syncIdentifier"]
 
  Notes:
@@ -82,7 +83,7 @@ extension StoredDosingDecision: IdentifiableDatum {
                                timeZone: datumTimeZone,
                                timeZoneOffset: datumTimeZoneOffset,
                                associations: associations,
-                               payload: datumPayload,
+                               payload: datumDosingDecisionPayload,
                                origin: origin)
     }
 
@@ -126,7 +127,7 @@ extension StoredDosingDecision: IdentifiableDatum {
         guard let originalCarbEntry = originalCarbEntry else {
             return nil
         }
-        let carbohydrate = TDosingDecisionDatum.Nutrition.Carbohydrate(net: originalCarbEntry.quantity.doubleValue(for: .gram()), units: .grams)
+        let carbohydrate = TDosingDecisionDatum.Nutrition.Carbohydrate(net: originalCarbEntry.quantity.doubleValue(for: .gram), units: .grams)
         let nutrition = TDosingDecisionDatum.Nutrition(carbohydrate: carbohydrate, estimatedAbsorptionDuration: originalCarbEntry.absorptionTime)
         return TDosingDecisionDatum.Food(time: originalCarbEntry.startDate, nutrition: nutrition)
     }
@@ -135,7 +136,7 @@ extension StoredDosingDecision: IdentifiableDatum {
         guard let carbEntry = carbEntry else {
             return nil
         }
-        let carbohydrate = TDosingDecisionDatum.Nutrition.Carbohydrate(net: carbEntry.quantity.doubleValue(for: .gram()), units: .grams)
+        let carbohydrate = TDosingDecisionDatum.Nutrition.Carbohydrate(net: carbEntry.quantity.doubleValue(for: .gram), units: .grams)
         let nutrition = TDosingDecisionDatum.Nutrition(carbohydrate: carbohydrate, estimatedAbsorptionDuration: carbEntry.absorptionTime)
         return TDosingDecisionDatum.Food(time: carbEntry.startDate, nutrition: nutrition)
     }
@@ -152,7 +153,7 @@ extension StoredDosingDecision: IdentifiableDatum {
         guard let carbsOnBoard = carbsOnBoard else {
             return nil
         }
-        return TDosingDecisionDatum.CarbohydratesOnBoard(time: carbsOnBoard.startDate, amount: carbsOnBoard.quantity.doubleValue(for: .gram()).rounded(decimalPlaces: 4))
+        return TDosingDecisionDatum.CarbohydratesOnBoard(time: carbsOnBoard.startDate, amount: carbsOnBoard.quantity.doubleValue(for: .gram).rounded(decimalPlaces: 4))
     }
 
     private var datumInsulinOnBoard: TDosingDecisionDatum.InsulinOnBoard? {
@@ -276,6 +277,12 @@ extension StoredDosingDecision: IdentifiableDatum {
         dictionary["syncIdentifier"] = syncIdentifier.uuidString
         return dictionary
     }
+
+    private var datumDosingDecisionPayload: TDictionary {
+        var dictionary = datumPayload
+        dictionary["algorithmExperiments"] = algorithmExperiments?.map { $0.jsonObject }
+        return dictionary
+    }
 }
 
 extension StoredDosingDecision.Settings: IdentifiableDatum {
@@ -298,7 +305,7 @@ fileprivate extension StoredDosingDecision.ControllerStatus.BatteryState {
 }
 
 fileprivate extension PumpManagerStatus.BasalDeliveryState {
-    var datum: TPumpStatusDatum.BasalDelivery {
+    var datum: TPumpStatusDatum.BasalDelivery? {
         switch self {
         case .active(let at):
             return TPumpStatusDatum.BasalDelivery(state: .scheduled, time: at)
@@ -314,6 +321,8 @@ fileprivate extension PumpManagerStatus.BasalDeliveryState {
             return TPumpStatusDatum.BasalDelivery(state: .suspended, time: at)
         case .resuming:
             return TPumpStatusDatum.BasalDelivery(state: .resuming)
+        case .pumpInoperable:
+            return nil
         }
     }
 }
@@ -343,8 +352,8 @@ fileprivate extension DoseEntry {
     }
 }
 
-fileprivate extension HKQuantity {
-    func doubleValueClampedAndRounded(for unit: HKUnit) -> Double {
+fileprivate extension LoopQuantity {
+    func doubleValueClampedAndRounded(for unit: LoopUnit) -> Double {
         let value = doubleValue(for: unit)
         switch unit {
         case .milligramsPerDeciliter:

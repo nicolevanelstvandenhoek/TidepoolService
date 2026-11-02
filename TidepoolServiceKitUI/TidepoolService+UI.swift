@@ -29,12 +29,12 @@ enum TidepoolServiceError: Error {
     case missingWindow
 }
 
-extension TidepoolService: ServiceUI {
+extension TidepoolService: @retroactive ServiceUI {
     public static var image: UIImage? {
         UIImage(frameworkImage: "Tidepool Logo")
     }
 
-    public static func setupViewController(colorPalette: LoopUIColorPalette, pluginHost: PluginHost) -> SetupUIResult<ServiceViewController, ServiceUI> {
+    public static func setupViewController(pluginHost: PluginHost, onboarding: Bool, allowDebugFeatures: Bool) -> SetupUIResult<ServiceViewController, ServiceUI> {
 
         let navController = ServiceNavigationController()
         navController.isNavigationBarHidden = true
@@ -44,7 +44,7 @@ extension TidepoolService: ServiceUI {
 
             let settingsView = await SettingsView(service: service, login: { environment in
 
-                guard let window = await navController.view.window else {
+                guard let window = navController.view.window else {
                     throw TidepoolServiceError.missingWindow
                 }
 
@@ -53,21 +53,25 @@ extension TidepoolService: ServiceUI {
                 let auth = OAuth2Authenticator(api: service.tapi, environment: environment, sessionProvider: sessionProvider)
                 try await auth.login()
                 try await service.completeCreate()
-                await navController.notifyServiceCreatedAndOnboarded(service)
+                navController.notifyServiceCreatedAndOnboarded(service)
             }, dismiss: {
                 Task {
                     await navController.notifyComplete()
                 }
-            })
+            }, onboarding: onboarding).environment(\.allowDebugFeatures, allowDebugFeatures)
 
             let hostingController = await UIHostingController(rootView: settingsView)
             await navController.pushViewController(hostingController, animated: false)
         }
-        
+
         return .userInteractionRequired(navController)
     }
 
-    public func settingsViewController(colorPalette: LoopUIColorPalette) -> ServiceViewController {
+    public static func setupViewController(colorPalette: LoopUIColorPalette, pluginHost: PluginHost, allowDebugFeatures: Bool) -> SetupUIResult<ServiceViewController, ServiceUI> {
+        return setupViewController(pluginHost: pluginHost, onboarding: false, allowDebugFeatures: allowDebugFeatures)
+    }
+
+    public func settingsViewController(colorPalette: LoopUIColorPalette, allowDebugFeatures: Bool) -> ServiceViewController {
 
         let navController = ServiceNavigationController()
         navController.isNavigationBarHidden = true
@@ -75,7 +79,7 @@ extension TidepoolService: ServiceUI {
         Task {
             let settingsView = await SettingsView(service: self, login: { [weak self] environment in
                 if let self {
-                    guard let window = await navController.view.window else {
+                    guard let window = navController.view.window else {
                         throw TidepoolServiceError.missingWindow
                     }
 
@@ -88,7 +92,7 @@ extension TidepoolService: ServiceUI {
                 Task {
                     await navController.notifyComplete()
                 }
-            })
+            }, onboarding: false).environment(\.allowDebugFeatures, allowDebugFeatures)
 
             let hostingController = await UIHostingController(rootView: settingsView)
             await navController.pushViewController(hostingController, animated: false)
